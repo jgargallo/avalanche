@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+</head>
+
+<body>
+<h3>Avalanche!!!</h3>
+<pre id="output"></pre>
+
+<script>
+    var slicedPath = location.pathname.split("/")
+    $.post("/lines/" + slicedPath[slicedPath.length - 1] + "/turn", function( data ) {
+        wsConnect(data);
+    });
+
+    function wsConnect(data) {
+        var url = 'ws://localhost:12312/lines/' + data.resource + '/nextIn';
+        c = new WebSocket(url);
+
+        send = function (data) {
+            $("#output").append((new Date()) + " ==> " + data + "\n");
+            c.send(data)
+        }
+
+        c.onmessage = function (msg) {
+            $("#output").append((new Date()) + " <== " + msg.data + "\n");
+            console.log(msg)
+        }
+
+        c.onopen = function () {
+            send("ping")
+        }
+    }
+</script>
+
+</body>
+</html>
