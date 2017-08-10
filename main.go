@@ -6,7 +6,6 @@ import (
 	"github.com/gorilla/websocket"
 	"bitbucket.org/jgargallo/avalanche/lines"
 	"net/http"
-	"time"
 	"strconv"
 	"strings"
 )
@@ -136,15 +135,9 @@ func wshandler(w http.ResponseWriter, r *http.Request, resource string) {
 		return
 	}
 
-	t, _, err := conn.ReadMessage()
-	if err != nil {
-		return
-	}
+	conn.ReadMessage()
 
 	line := getCachedLine(resource)
 
-	for {
-		time.Sleep(1000 * time.Millisecond)
-		conn.WriteMessage(t, []byte(fmt.Sprint(line.NextIn())))
-	}
+	line.AppendTurnConn(conn)
 }

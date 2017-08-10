@@ -3,6 +3,8 @@ package lines
 import (
 	"github.com/gorilla/websocket"
 	"sync"
+	"time"
+	"fmt"
 )
 
 const (
@@ -10,20 +12,24 @@ const (
 	ConnsCapacity = 1000
 )
 
-
-type TurnConn struct {
-	turn uint32
-	conn *websocket.Conn
-}
+var lineMux sync.Mutex
 
 type TurnsPool struct {
-	conns []*TurnConn
+	conns []*websocket.Conn
 }
 
 func NewTurnsPool() *TurnsPool {
 	return &TurnsPool{
-		conns: make([]*TurnConn, 0, ConnsCapacity),
+		conns: make([]*websocket.Conn, 0, ConnsCapacity),
 	}
+}
+
+func (pool *TurnsPool) AppendTurnConn(conn *websocket.Conn) {
+	pool.conns = append(pool.conns, conn)
+}
+
+func (pool *TurnsPool) IsFull() bool {
+	return len(pool.conns) == cap(pool.conns)
 }
 
 type Line struct {
@@ -38,10 +44,11 @@ type Line struct {
 
 	pools []*TurnsPool
 	currentPool *TurnsPool
-	nextPoolMux sync.Mutex
+	appendConnMux sync.Mutex
 }
 
 func NewLine(id string) *Line {
+	lineMux.Lock()
 	line := &Line{
 		id: id,
 		nextTurn: 0, //TODO to be replaced by Redis impl
@@ -50,6 +57,9 @@ func NewLine(id string) *Line {
 	}
 
 	line.newTurnsPool()
+	lineMux.Unlock()
+
+	go broadcastNextIn(line, line.currentPool)
 
 	return line
 }
@@ -70,11 +80,9 @@ func (line *Line) NextIn() uint32 {
 }
 
 func (line *Line) newTurnsPool()  {
-	line.nextPoolMux.Lock()
 	pool := NewTurnsPool()
 	line.pools = append(line.pools, pool)
 	line.currentPool = pool
-	line.nextPoolMux.Unlock()
 }
 
 func (line *Line) ReleaseTurn() uint32 {
@@ -84,4 +92,30 @@ func (line *Line) ReleaseTurn() uint32 {
 	line.nextInMux.Unlock()
 
 	return nextIn
+}
+
+func (line *Line) AppendTurnConn(conn *websocket.Conn)  {
+	line.appendConnMux.Lock()
+	isNewPool := line.currentPool.IsFull()
+	var newPool *TurnsPool
+	if isNewPool {
+		line.newTurnsPool()
+		newPool = line.currentPool
+	}
+	line.currentPool.AppendTurnConn(conn)
+	line.appendConnMux.Unlock()
+
+	if isNewPool {
+		go broadcastNextIn(line, newPool)
+	}
+}
+
+func broadcastNextIn(line *Line, turnsPool *TurnsPool) {
+	for {
+		fmt.Println(line.NextIn())
+		for _, conn := range turnsPool.conns {
+			conn.WriteMessage(1, []byte(fmt.Sprint(line.NextIn())))
+		}
+		time.Sleep(3000 * time.Millisecond)
+	}
 }

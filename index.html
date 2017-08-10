@@ -9,6 +9,12 @@
 <pre id="output"></pre>
 
 <script>
+    function getCookie(name) {
+        var value = "; " + document.cookie;
+        var parts = value.split("; " + name + "=");
+        if (parts.length == 2) return parts.pop().split(";").shift();
+    }
+
     var slicedPath = location.pathname.split("/")
     $.post("/lines/" + slicedPath[slicedPath.length - 1] + "/turn", function( data ) {
         wsConnect(data);
@@ -25,11 +31,16 @@
 
         c.onmessage = function (msg) {
             $("#output").append((new Date()) + " <== " + msg.data + "\n");
-            console.log(msg)
+            var myTurn = Number(getCookie("av_t"));
+            if (myTurn <= Number(msg.data)) {
+                $("#output").append("My Turn!!!!!!");
+                c.close();
+            }
+
         }
 
         c.onopen = function () {
-            send("ping")
+            send(".")
         }
     }
 </script>
