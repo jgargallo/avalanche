@@ -16,7 +16,7 @@
     }
 
     var slicedPath = location.pathname.split("/")
-    $.post("/lines/" + slicedPath[slicedPath.length - 1] + "/turn", function( data ) {
+    $.post("/lines/" + slicedPath[slicedPath.length - 1] + "/nextTurn", function( data ) {
         wsConnect(data);
     });
 
