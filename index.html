@@ -17,6 +17,8 @@
 
     var slicedPath = location.pathname.split("/")
     $.post("/lines/" + slicedPath[slicedPath.length - 1] + "/nextTurn", function( data ) {
+        var myTurn = Number(getCookie("av_t"));
+        $("#output").append((new Date()) + " ==> My turn: " + myTurn + "\n");
         wsConnect(data);
     });
 
@@ -29,18 +31,27 @@
             c.send(data)
         }
 
+        c.onopen = function () {
+            send(".")
+        }
+
         c.onmessage = function (msg) {
             $("#output").append((new Date()) + " <== " + msg.data + "\n");
             var myTurn = Number(getCookie("av_t"));
             if (myTurn <= Number(msg.data)) {
-                $("#output").append("My Turn!!!!!!");
+                $("#output").append("My Turn!!!!!!\n");
                 c.close();
+                $.get( "/lines/" + slicedPath[slicedPath.length - 1] + "/token", function( data ) {
+                    console.log(data.turn);
+                    $("#output").append((new Date()) + " <== TOKEN ISSUED for turn " + data.turn + "\n");
+                })
+                    .fail(function() {
+                        alert( "error" );
+                    })
+                    .always(function() {
+                    });
             }
 
-        }
-
-        c.onopen = function () {
-            send(".")
         }
     }
 </script>

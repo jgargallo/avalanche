@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 func main() {
@@ -34,15 +35,21 @@ const (
 
 var cachedLines = make(map[string]*lines.Line)
 
+var lineMux sync.Mutex
+
 func getCachedLine(resource string) *lines.Line {
 	line, cachedLine := cachedLines[resource]
-	if !cachedLine {
-		line = lines.NewLine(resource)
-		cachedLines[resource] = line
+	if !cachedLine { // double check to use mutex only when line not cached
+		lineMux.Lock()
+		_, c := cachedLines[resource]
+		if !c {
+			line = lines.NewLine(resource)
+			cachedLines[resource] = line
+		}
+		lineMux.Unlock()
 	}
 	return line
 }
-
 
 func NextTurn(c *gin.Context) {
 	resource := c.Param("resource")
@@ -84,7 +91,6 @@ func wsHandler(w http.ResponseWriter, r *http.Request, resource string) {
 	conn.ReadMessage()
 
 	line := getCachedLine(resource)
-
 	line.AppendTurnConn(conn)
 }
 

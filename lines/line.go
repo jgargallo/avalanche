@@ -9,10 +9,8 @@ import (
 
 const (
 	TurnsPoolsCapacity = 100
-	ConnsCapacity = 1000
+	ConnsCapacity = 1
 )
-
-var lineMux sync.Mutex
 
 type TurnsPool struct {
 	conns []*websocket.Conn
@@ -48,7 +46,7 @@ type Line struct {
 }
 
 func NewLine(id string) *Line {
-	lineMux.Lock()
+
 	line := &Line{
 		id: id,
 		nextTurn: 0, //TODO to be replaced by Redis impl
@@ -57,9 +55,8 @@ func NewLine(id string) *Line {
 	}
 
 	line.newTurnsPool()
-	lineMux.Unlock()
 
-	go broadcastNextIn(line, line.currentPool)
+	go line.broadcastNextIn(line.currentPool)
 
 	return line
 }
@@ -106,13 +103,13 @@ func (line *Line) AppendTurnConn(conn *websocket.Conn)  {
 	line.appendConnMux.Unlock()
 
 	if isNewPool {
-		go broadcastNextIn(line, newPool)
+		go line.broadcastNextIn(newPool)
 	}
 }
 
-func broadcastNextIn(line *Line, turnsPool *TurnsPool) {
+func (line *Line) broadcastNextIn(turnsPool *TurnsPool) {
 	for {
-		fmt.Println(line.NextIn())
+		fmt.Printf("%p -> %v\n", turnsPool, line.NextIn())
 		for _, conn := range turnsPool.conns {
 			conn.WriteMessage(1, []byte(fmt.Sprint(line.NextIn())))
 		}
