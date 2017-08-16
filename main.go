@@ -76,8 +76,8 @@ func NextTurn(c *gin.Context) {
 }
 
 var wsupgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
+	ReadBufferSize:  32,
+	WriteBufferSize: 32,
 }
 
 
@@ -88,6 +88,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request, resource string) {
 		return
 	}
 
+	// TODO use control messages instead
 	conn.ReadMessage()
 
 	line := getCachedLine(resource)

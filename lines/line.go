@@ -113,6 +113,6 @@ func (line *Line) broadcastNextIn(turnsPool *TurnsPool) {
 		for _, conn := range turnsPool.conns {
 			conn.WriteMessage(1, []byte(fmt.Sprint(line.NextIn())))
 		}
-		time.Sleep(3000 * time.Millisecond)
+		time.Sleep(300 * time.Millisecond)
 	}
 }
