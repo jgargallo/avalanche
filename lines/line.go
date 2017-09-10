@@ -10,6 +10,9 @@ import (
 const (
 	TurnsPoolsCapacity = 100
 	ConnsCapacity = 1
+	DefaultAccessMaxAge = 600
+	DefaultWaitingMaxAge = 15
+	DefaultLineCapacity = 2 // clients accessing resource at the same time
 )
 
 type TurnsPool struct {
@@ -32,6 +35,9 @@ func (pool *TurnsPool) IsFull() bool {
 
 type Line struct {
 	id string
+	accessMaxAge uint32 // max time accessing resource (starts counting after getting the Token)
+	waitingMaxAge uint32 // max time waiting to access resource (between access given and actually getting the Token)
+	capacity uint32
 
 	nextTurn uint32 //TODO to be replaced by Redis, we cannot cache this
 	nextTurnMux sync.Mutex
@@ -40,25 +46,48 @@ type Line struct {
 	nextIn uint32 // Next one to get access to the resource
 	nextInMux sync.Mutex
 
+	//TODO sorted set queue to control expiration
+
 	pools []*TurnsPool
 	currentPool *TurnsPool
 	appendConnMux sync.Mutex
 }
 
+//TODO health check: size of sorted set <= line.capacity
+
 func NewLine(id string) *Line {
 
 	line := &Line{
 		id: id,
+		accessMaxAge: DefaultAccessMaxAge,
+		waitingMaxAge: DefaultWaitingMaxAge,
+		capacity: DefaultLineCapacity,
 		nextTurn: 0, //TODO to be replaced by Redis impl
-		nextIn: 1, // TODO to be replaced by Redis impl
+		nextIn: DefaultLineCapacity, // TODO to be replaced by Redis impl
 		pools: make([]*TurnsPool, 1, TurnsPoolsCapacity),
 	}
+
+	//TODO initialize sorted set
+
+	//TODO goroutine for handling expiration
 
 	line.newTurnsPool()
 
 	go line.broadcastNextIn(line.currentPool)
 
 	return line
+}
+
+func (line *Line) GetId() string {
+	return line.id
+}
+
+func (line *Line) GetAccessMaxAge() uint32 {
+	return line.accessMaxAge
+}
+
+func (line *Line) GetWaitingMaxAge() uint32 {
+	return line.waitingMaxAge
 }
 
 // Mutex is required for memory implementation, when using Redis will be removed
@@ -73,6 +102,7 @@ func (line *Line) GetNextTurn() uint32 {
 }
 
 func (line *Line) NextIn() uint32 {
+	//TODO from redis
 	return line.nextIn
 }
 
@@ -82,11 +112,18 @@ func (line *Line) newTurnsPool()  {
 	line.currentPool = pool
 }
 
-func (line *Line) ReleaseTurn() uint32 {
+func (line *Line) ReleaseTurn(turn uint32) uint32 {
+	//TODO remove turn from redis sorted set with ZREM
+	//TODO check ZREM result, line.nextIn++ only when ZREM result == 1
+	//TODO this whole operation must be atomic so LUA script required
+
+
 	line.nextInMux.Lock()
 	line.nextIn++
 	nextIn := line.nextIn
 	line.nextInMux.Unlock()
+
+	//TODO zadd nextIn with now + waitingMaxAge as score
 
 	return nextIn
 }

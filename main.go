@@ -20,10 +20,10 @@ func main() {
 		c.HTML(200, "index.html", nil)
 	})
 
-	r.POST("/lines/:resource/nextTurn", NextTurn)
-	r.GET("/lines/:resource/nextIn", NextIn)
-	r.GET("/lines/:resource/token", GetToken)
-	r.GET("/lines/:resource/release", ReleaseResource)
+	r.POST("/lines/:resource/nextTurn", NextTurn) // request for a new turn
+	r.GET("/lines/:resource/nextIn", NextIn) // webSocket to be updated with next turn allowed to get in
+	r.GET("/lines/:resource/token", GetToken) // access granted, time to request for the token to access resource
+	r.GET("/lines/:resource/release/:turn", ReleaseResource) // releases resource, nextIn incremented
 
 	r.Run("localhost:12312")
 }
@@ -31,6 +31,7 @@ func main() {
 const (
 	TurnCookieName = "av_t"
 	SignedTurnCookieName = "av_tsig"
+	CookieMaxAge = 864000 // 10 days
 )
 
 var cachedLines = make(map[string]*lines.Line)
@@ -56,22 +57,30 @@ func NextTurn(c *gin.Context) {
 	line := getCachedLine(resource)
 
 	cookie, err := c.Request.Cookie(SignedTurnCookieName)
-	var nextTurn string
+	var nextTurnCookie string
 	if err != nil {
-		nextTurn = fmt.Sprint(line.GetNextTurn())
+		nextTurn := line.GetNextTurn()
 		cookiePath := fmt.Sprintf("/lines/%v", resource)
-		// TODO created cookie with signed turn
-		c.SetCookie(TurnCookieName, nextTurn, 600, cookiePath, "", false, false)
-		c.SetCookie(SignedTurnCookieName, nextTurn, 600, cookiePath, "", false, true)
+		nextTurnCookie = fmt.Sprint(nextTurn)
+		if nextTurn <= line.NextIn() {
+			c.SetCookie(TurnCookieName, nextTurnCookie, CookieMaxAge, cookiePath, "", false, false)
+			processGetToken(c, line, nextTurn)
+			return
+		} else {
+
+			// TODO created cookie with signed turn
+			c.SetCookie(TurnCookieName, nextTurnCookie, CookieMaxAge, cookiePath, "", false, false)
+			c.SetCookie(SignedTurnCookieName, nextTurnCookie, CookieMaxAge, cookiePath, "", false, true)
+		}
 	} else {
-		// TODO If existing cookie with valid turn: do nothing
+		nextTurnCookie = cookie.Value
 		// TODO If existing cookie with past turn: overwrite cookie with new turn
-		nextTurn = cookie.Value
 	}
 
 	c.JSON(200, gin.H{
 		"resource": resource,
-		"turn": nextTurn,
+		"turn": nextTurnCookie,
+		"status": "waiting",
 	})
 }
 
@@ -134,19 +143,36 @@ func GetToken(c *gin.Context) {
 		return
 	}
 
-	cookiePath := fmt.Sprintf("/lines/%v", resource)
-	c.SetCookie(SignedTurnCookieName, fmt.Sprintf("%v,IN", cookie.Value), 600, cookiePath, "", false, true)
+	processGetToken(c, line, turn)
+}
+
+func processGetToken(c *gin.Context, line *lines.Line, turn uint32) {
+	cookiePath := fmt.Sprintf("/lines/%v", line.GetId())
+	c.SetCookie(SignedTurnCookieName, fmt.Sprintf("%v,IN", turn), int(line.GetAccessMaxAge()),
+		cookiePath, "", false, true)
+	//TODO update sorted set
 
 	c.JSON(200, gin.H{
+		"resource": line.GetId(),
+		"turn": turn,
 		"status": "access_granted",
-		"turn": cookie.Value,
 	})
 }
 
 func ReleaseResource(c *gin.Context) {
 	resource := c.Param("resource")
+	turn := c.Param("turn")
+	turn64, err := strconv.ParseUint(turn, 10, 32)
+	if err != nil {
+		c.JSON(400, gin.H{
+			"resource": resource,
+			"message": "Invalid turn",
+		})
+		return
+	}
+
 	line := getCachedLine(resource)
-	nextIn := line.ReleaseTurn()
+	nextIn := line.ReleaseTurn(uint32(turn64))
 	c.JSON(200, gin.H{
 		"resource": resource,
 		"next_in": nextIn,
