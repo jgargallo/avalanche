@@ -9,7 +9,7 @@ import (
 
 const (
 	TurnsPoolsCapacity = 100
-	ConnsCapacity = 1
+	ConnsCapacityPerTurnsPool = 1 //TODO right capacity? (balance between goroutines and iterations per goroutine)
 	DefaultAccessMaxAge = 600
 	DefaultWaitingMaxAge = 15
 	DefaultLineCapacity = 2 // clients accessing resource at the same time
@@ -21,7 +21,7 @@ type TurnsPool struct {
 
 func NewTurnsPool() *TurnsPool {
 	return &TurnsPool{
-		conns: make([]*websocket.Conn, 0, ConnsCapacity),
+		conns: make([]*websocket.Conn, 0, ConnsCapacityPerTurnsPool),
 	}
 }
 
@@ -92,7 +92,7 @@ func (line *Line) GetWaitingMaxAge() uint32 {
 
 // Mutex is required for memory implementation, when using Redis will be removed
 // since Redis is mono-thread
-func (line *Line) GetNextTurn() uint32 {
+func (line *Line) IncNextTurn() uint32 {
 	line.nextTurnMux.Lock()
 	line.nextTurn++
 	next := line.nextTurn
@@ -101,7 +101,7 @@ func (line *Line) GetNextTurn() uint32 {
 	return next
 }
 
-func (line *Line) NextIn() uint32 {
+func (line *Line) GetNextIn() uint32 {
 	//TODO from redis
 	return line.nextIn
 }
@@ -146,10 +146,12 @@ func (line *Line) AppendTurnConn(conn *websocket.Conn)  {
 
 func (line *Line) broadcastNextIn(turnsPool *TurnsPool) {
 	for {
-		fmt.Printf("%p -> %v\n", turnsPool, line.NextIn())
+		fmt.Printf("Pool %v::%p -> NextTurn: %v, NextIn: %v\n",
+			line.id, turnsPool, line.nextTurn, line.GetNextIn())
 		for _, conn := range turnsPool.conns {
-			conn.WriteMessage(1, []byte(fmt.Sprint(line.NextIn())))
+			conn.WriteMessage(1, []byte(fmt.Sprint(line.GetNextIn())))
 		}
-		time.Sleep(300 * time.Millisecond)
+		fmt.Printf("***********************\n")
+		time.Sleep(1000 * time.Millisecond)
 	}
 }

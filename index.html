@@ -31,7 +31,7 @@
         c = new WebSocket(url);
 
         send = function (data) {
-            $("#output").append((new Date()) + " ==> " + data + "\n");
+            $("#output").append((new Date()) + " ==> WS connection open\n");
             c.send(data)
         }
 
@@ -40,9 +40,9 @@
         }
 
         c.onmessage = function (msg) {
-            $("#output").append((new Date()) + " <== " + msg.data + "\n");
             var myTurn = Number(getCookie("av_t"));
-            if (myTurn <= Number(msg.data)) {
+            $("#output").append((new Date()) + " <== MyTurn = " + myTurn + ", NextIn = " + msg.data + "\n");
+            if (myTurn < Number(msg.data)) {
                 $("#output").append("My Turn!!!!!!\n");
                 c.close();
                 $.get( "/lines/" + slicedPath[slicedPath.length - 1] + "/token", function( data ) {

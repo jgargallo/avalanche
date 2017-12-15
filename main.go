@@ -59,10 +59,10 @@ func NextTurn(c *gin.Context) {
 	cookie, err := c.Request.Cookie(SignedTurnCookieName)
 	var nextTurnCookie string
 	if err != nil {
-		nextTurn := line.GetNextTurn()
+		nextTurn := line.IncNextTurn()
 		cookiePath := fmt.Sprintf("/lines/%v", resource)
 		nextTurnCookie = fmt.Sprint(nextTurn)
-		if nextTurn <= line.NextIn() {
+		if nextTurn <= line.GetNextIn() {
 			c.SetCookie(TurnCookieName, nextTurnCookie, CookieMaxAge, cookiePath, "", false, false)
 			processGetToken(c, line, nextTurn)
 			return
@@ -134,7 +134,7 @@ func GetToken(c *gin.Context) {
 	// TODO Check if token already delivered, if so return 200 and do nothing
 
 	line := getCachedLine(resource)
-	nextIn := line.NextIn()
+	nextIn := line.GetNextIn()
 	if turn > nextIn {
 		c.JSON(400, gin.H{
 			"resource": resource,
