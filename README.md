@@ -1,29 +1,14 @@
-# README #
+# HA system to handle virtual queues #
 
-This README would normally document whatever steps are necessary to get your application up and running.
+User experience when entering virtual queues for high demand events, let's say on-sales, it's always frustating. Users always feel they are at a random queue.
 
-### What is this repository for? ###
+Big challenge here is to broadcast to all users (millions) the current status in the queue
 
-* Quick summary
-* Version
-* [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
+Since I wanted to learn Go, this is a great use case to try out.
 
-### How do I get set up? ###
+### Services exposed [WIP] ###
 
-* Summary of set up
-* Configuration
-* Dependencies
-* Database configuration
-* How to run tests
-* Deployment instructions
-
-### Contribution guidelines ###
-
-* Writing tests
-* Code review
-* Other guidelines
-
-### Who do I talk to? ###
-
-* Repo owner or admin
-* Other community or team contact
+* POST "/lines/:resource/nextTurn" // request for a new turn
+*	GET "/lines/:resource/nextIn" // webSocket to be updated with next turn allowed to get in
+*	GET "/lines/:resource/token" // access granted, time to request for the token to access resource
+*	GET "/lines/:resource/release/:turn" // releases resource, nextIn incremented
