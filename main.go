@@ -62,7 +62,7 @@ func NextTurn(c *gin.Context) {
 		nextTurn := line.IncNextTurn()
 		cookiePath := fmt.Sprintf("/lines/%v", resource)
 		nextTurnCookie = fmt.Sprint(nextTurn)
-		if nextTurn <= line.GetNextIn() {
+		if line.IsAccessGranted(nextTurn) {
 			c.SetCookie(TurnCookieName, nextTurnCookie, CookieMaxAge, cookiePath, "", false, false)
 			processGetToken(c, line, nextTurn)
 			return
@@ -150,6 +150,7 @@ func processGetToken(c *gin.Context, line *lines.Line, turn uint32) {
 	cookiePath := fmt.Sprintf("/lines/%v", line.GetId())
 	c.SetCookie(SignedTurnCookieName, fmt.Sprintf("%v,IN", turn), int(line.GetAccessMaxAge()),
 		cookiePath, "", false, true)
+
 	//TODO update sorted set
 
 	c.JSON(200, gin.H{

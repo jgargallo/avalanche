@@ -9,7 +9,7 @@ import (
 
 const (
 	TurnsPoolsCapacity = 100
-	ConnsCapacityPerTurnsPool = 1 //TODO right capacity? (balance between goroutines and iterations per goroutine)
+	ConnsCapacityPerTurnsPool = 2 //TODO right capacity? (balance between goroutines and iterations per goroutine)
 	DefaultAccessMaxAge = 600
 	DefaultWaitingMaxAge = 15
 	DefaultLineCapacity = 2 // clients accessing resource at the same time
@@ -30,6 +30,7 @@ func (pool *TurnsPool) AppendTurnConn(conn *websocket.Conn) {
 }
 
 func (pool *TurnsPool) IsFull() bool {
+	fmt.Printf("Curr pool capacity: %v of %v", len(pool.conns), cap(pool.conns))
 	return len(pool.conns) == cap(pool.conns)
 }
 
@@ -106,6 +107,10 @@ func (line *Line) GetNextIn() uint32 {
 	return line.nextIn
 }
 
+func (line *Line) IsAccessGranted(turn uint32) bool {
+	return turn <= line.GetNextIn()
+}
+
 func (line *Line) newTurnsPool()  {
 	pool := NewTurnsPool()
 	line.pools = append(line.pools, pool)
@@ -152,6 +157,6 @@ func (line *Line) broadcastNextIn(turnsPool *TurnsPool) {
 			conn.WriteMessage(1, []byte(fmt.Sprint(line.GetNextIn())))
 		}
 		fmt.Printf("***********************\n")
-		time.Sleep(1000 * time.Millisecond)
+		time.Sleep(5000 * time.Millisecond)
 	}
 }
